@@ -1,0 +1,92 @@
+.header {
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.logo {
+  width: 34px;
+  height: 34px;
+  background: #111;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--mono);
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.brand {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+}
+
+.brand span {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.12s;
+  white-space: nowrap;
+}
+
+.btn:hover { background: #f3f4f6; }
+
+.btnPrimary {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+.btnPrimary:hover { background: #333; }
+
+.btnSync {
+  border-color: #bbf7d0;
+  color: var(--green);
+  background: #f0fdf4;
+}
+
+.btnSync:hover { background: #dcfce7; }
+.btnSync:disabled { opacity: 0.6; cursor: default; }
+
+@media (max-width: 600px) {
+  .btn:not(.btnPrimary) { display: none; }
+}

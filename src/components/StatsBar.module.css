@@ -1,0 +1,38 @@
+.bar {
+  display: flex;
+  gap: 1px;
+  background: var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.stat {
+  flex: 1;
+  background: #fff;
+  padding: 9px 8px;
+  text-align: center;
+  min-width: 0;
+}
+
+.num {
+  font-size: 18px;
+  font-weight: 600;
+  font-family: var(--mono);
+  line-height: 1;
+}
+
+.label {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.blue   { color: var(--blue); }
+.amber  { color: var(--amber); }
+.green  { color: var(--green); }
+.purple { color: var(--purple); }
+.red    { color: var(--red); }

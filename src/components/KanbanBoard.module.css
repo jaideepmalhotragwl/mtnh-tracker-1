@@ -1,0 +1,130 @@
+.wrap {
+  padding: 16px 20px;
+  overflow-x: auto;
+  min-height: calc(100vh - 190px);
+}
+
+.board {
+  display: flex;
+  gap: 12px;
+  min-width: max-content;
+  align-items: flex-start;
+}
+
+.column { width: 228px; flex-shrink: 0; }
+
+.colHeader {
+  padding: 9px 11px;
+  border-radius: 10px 10px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.colTitle {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.colCount {
+  font-size: 10px;
+  font-family: var(--mono);
+  background: rgba(0,0,0,0.09);
+  padding: 2px 6px;
+  border-radius: 20px;
+}
+
+.colBody {
+  background: #e8e8e5;
+  border-radius: 0 0 10px 10px;
+  padding: 7px;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px 11px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: box-shadow 0.12s, border-color 0.12s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
+.card:hover {
+  box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+  border-color: #d1d5db;
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.cardTitle {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  flex: 1;
+}
+
+.daysBadge {
+  font-size: 10px;
+  font-family: var(--mono);
+  background: #f3f4f6;
+  color: #374151;
+  padding: 1px 5px;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cardId {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: var(--mono);
+  margin-bottom: 6px;
+}
+
+.flags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.flag {
+  font-size: 9px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.flagDone    { background: #def7ec; color: #03543f; }
+.flagNo      { background: #fde8e8; color: #9b1c1c; }
+.flagPending { background: #fef3c7; color: #92400e; }
+.flagNa      { background: #f3f4f6; color: #9ca3af; }
+
+.team {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 24px 0;
+  color: #9ca3af;
+  font-size: 11px;
+}
