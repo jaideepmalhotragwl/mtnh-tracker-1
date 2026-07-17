@@ -1,0 +1,36 @@
+.wrap{padding:16px 20px;overflow-x:auto;min-height:calc(100vh - 200px)}
+.board{display:flex;gap:12px;min-width:max-content;align-items:flex-start}
+.col{width:228px;flex-shrink:0}
+.colHdr{padding:9px 11px;border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:space-between}
+.colTitle{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px}
+.colCount{font-size:10px;font-family:var(--mono);background:rgba(0,0,0,.09);padding:2px 6px;border-radius:20px}
+.colBody{background:#e8e8e5;border-radius:0 0 10px 10px;padding:7px;min-height:80px;display:flex;flex-direction:column;gap:6px}
+
+.card{background:#fff;border-radius:8px;padding:10px 11px;border:1px solid transparent;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.06);transition:box-shadow .12s,border-color .12s}
+.card:hover{box-shadow:0 3px 10px rgba(0,0,0,.10);border-color:#d1d5db}
+.notAssigned{border-color:#fca5a5 !important;border-width:1.5px}
+
+.cardTop{display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:2px}
+.cardTitle{font-size:12px;font-weight:600;line-height:1.3;flex:1}
+.days{font-size:10px;font-family:var(--mono);background:#f3f4f6;color:#374151;padding:1px 5px;border-radius:4px;white-space:nowrap;flex-shrink:0}
+.cardId{font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:4px}
+.emailDate{font-size:10px;color:#6b7280;margin-bottom:5px}
+.flags{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px}
+.flag{font-size:9px;font-weight:500;padding:2px 6px;border-radius:20px}
+.fDone{background:#def7ec;color:#03543f}
+.fNo{background:#fde8e8;color:#9b1c1c}
+.fPend{background:#fef3c7;color:#92400e}
+.fNa{background:#f3f4f6;color:#9ca3af}
+.team{font-size:10px;color:var(--muted)}
+
+.notAssignedAlert{background:#fef2f2;border:1px solid #fca5a5;border-radius:6px;padding:5px 8px;margin-top:6px;font-size:10px;font-weight:600;color:var(--red);display:flex;align-items:center;gap:4px}
+
+.warnBadge{display:inline-flex;align-items:center;gap:4px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:3px 7px;font-size:10px;font-weight:500;color:var(--orange);margin-top:5px;cursor:pointer;position:relative;width:100%}
+.warnBadge:hover .warnTip{display:block}
+.warnTip{display:none;position:absolute;bottom:calc(100% + 6px);left:0;right:0;background:#1a1a1a;color:#fff;border-radius:8px;padding:10px 12px;font-size:11px;line-height:1.9;z-index:50;box-shadow:0 4px 16px rgba(0,0,0,.2)}
+.warnTip::after{content:'';position:absolute;top:100%;left:14px;border:5px solid transparent;border-top-color:#1a1a1a}
+.warnTipTitle{font-size:10px;font-weight:600;color:#f87171;margin-bottom:4px}
+.warnTip ul{padding-left:14px}
+.warnTip li{color:#fca5a5}
+
+.empty{display:flex;flex-direction:column;align-items:center;gap:4px;padding:24px;color:#9ca3af;font-size:11px}

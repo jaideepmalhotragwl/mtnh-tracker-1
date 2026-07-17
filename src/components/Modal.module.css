@@ -1,0 +1,57 @@
+.modal{background:#fff;border-radius:14px;width:100%;display:flex;flex-direction:column;max-height:90vh}
+.header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0}
+.title{font-size:15px;font-weight:600}
+.closeBtn{width:28px;height:28px;border:none;background:#f3f4f6;border-radius:6px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.closeBtn:hover{background:#e5e7eb}
+.body{padding:20px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px}
+.footer{padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;flex-shrink:0}
+
+/* supabase status */
+.sbCard{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:12px}
+.sbIcon{width:38px;height:38px;background:#057a55;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;flex-shrink:0}
+.sbInfo{flex:1}
+.sbTitle{font-size:13px;font-weight:600;color:#065f46;margin-bottom:2px}
+.sbSub{font-size:11px;color:#047857}
+.connected{font-size:11px;color:var(--green);font-weight:600;flex-shrink:0}
+
+/* export */
+.exportCard{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:14px 16px}
+.exportTitle{font-size:12px;font-weight:600;color:#92400e;margin-bottom:6px}
+.exportSub{font-size:12px;color:#78350f;line-height:1.7;margin-bottom:10px}
+
+/* code */
+.codeWrap{background:#1e1e1e;border-radius:8px;overflow:hidden}
+.codeMeta{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;border-bottom:1px solid #333}
+.codeMeta span{font-size:11px;color:#6b7280;font-family:var(--mono)}
+.copyBtn{height:22px;padding:0 8px;border-radius:4px;font-size:11px;font-weight:500;border:1px solid #444;background:#333;color:#d4d4d4;cursor:pointer}
+.code{padding:12px;font-family:var(--mono);font-size:10px;color:#d4d4d4;overflow-x:auto;white-space:pre;margin:0;line-height:1.6}
+
+/* form inside modal */
+.formGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.formGroup{display:flex;flex-direction:column;gap:4px}
+.label{font-size:11px;font-weight:500;color:#374151}
+.input{height:32px;border:1px solid var(--border);border-radius:7px;padding:0 9px;font-size:12px;font-family:var(--font);outline:none;color:var(--text);background:#fff}
+.input:focus{border-color:var(--blue)}
+
+/* info box */
+.infoBox{background:#eff6ff;border:1px solid #bfdbfe;border-radius:var(--radius);padding:14px}
+.infoTitle{font-size:12px;font-weight:600;color:#1e40af;margin-bottom:6px}
+.infoText{font-size:12px;color:#1e3a8a;line-height:1.7}
+
+/* drop zone */
+.dropZone{border:2px dashed var(--border);border-radius:var(--radius);padding:32px;text-align:center;background:#fafaf9;cursor:pointer;transition:border-color .12s}
+.dropZone:hover{border-color:var(--blue)}
+.dropIcon{font-size:26px;opacity:.4;margin-bottom:8px}
+.dropTitle{font-size:14px;font-weight:500;margin-bottom:3px}
+.dropSub{font-size:12px;color:var(--muted)}
+
+/* preview */
+.previewBox{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:11px 14px}
+.previewTitle{font-size:13px;font-weight:600;color:#065f46;margin-bottom:3px}
+.previewSub{font-size:12px;color:#047857}
+
+/* buttons */
+.cancelBtn{height:32px;padding:0 14px;border-radius:7px;font-size:12px;font-weight:500;border:1px solid var(--border);background:#fff;cursor:pointer;font-family:var(--font)}
+.cancelBtn:hover{background:#f3f4f6}
+.primaryBtn{height:32px;padding:0 18px;border-radius:7px;font-size:12px;font-weight:500;border:none;background:#111;color:#fff;cursor:pointer;font-family:var(--font)}
+.primaryBtn:hover{background:#333}
