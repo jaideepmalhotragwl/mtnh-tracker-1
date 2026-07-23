@@ -89,7 +89,7 @@ function Tracker() {
     try {
       const n = await importRows(rows)
       showToast(`✓ ${n} sites imported to Supabase`)
-    } catch (err) { showToast('Import failed: ' + err.message, 'error') }
+    } catch (err) { const msg = err?.message || err?.details || err?.hint || JSON.stringify(err) || "Unknown error"; console.error("Import error:", err); showToast("Import failed: " + msg, "error") }
   }
 
   async function handleExport() {
