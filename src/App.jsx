@@ -9,25 +9,28 @@ import FieldView      from './components/FieldView'
 import ProjectForm    from './components/ProjectForm'
 import UploadModal    from './components/UploadModal'
 import ConfigModal    from './components/ConfigModal'
+import Warehouse      from './components/Warehouse'
 import Overlay        from './components/Overlay'
 import Toast          from './components/Toast'
 import { useProjects }  from './utils/useProjects'
 import { useRealtime }  from './utils/useRealtime'
 import { useToast }     from './utils/useToast'
 import { exportToSheets } from './utils/sheets'
-import { getStage, isNotAssigned, getMissingStages } from './utils/stageLogic'
+import { isNotAssigned, getMissingStages } from './utils/stageLogic'
 
 export default function App() {
   const [authed, setAuthed] = useState(() => sessionStorage.getItem('mtnh_auth') === '1')
+  const [app, setApp] = useState('tracker')   // tracker | warehouse
+
   if (!authed) return <PasswordGate onUnlock={() => setAuthed(true)} />
-  return <Tracker />
+  if (app === 'warehouse') return <Warehouse onBack={() => setApp('tracker')} />
+  return <Tracker onWarehouse={() => setApp('warehouse')} />
 }
 
-function Tracker() {
+function Tracker({ onWarehouse }) {
   const { projects, loading, add, update, remove, importRows, applyRealtimeEvent } = useProjects()
   const { toast, show: showToast } = useToast()
 
-  // Real-time handler
   const handleRealtimeEvent = useCallback((event) => {
     applyRealtimeEvent(event)
     if (event.eventType === 'UPDATE') {
@@ -38,13 +41,11 @@ function Tracker() {
 
   useRealtime(handleRealtimeEvent)
 
-  // UI state
   const [view,    setView]   = useState('kanban')
   const [modal,   setModal]  = useState(null)
   const [editId,  setEditId] = useState(null)
   const [exporting, setExporting] = useState(false)
 
-  // Filters
   const [search, setSearch] = useState('')
   const [zone,   setZone]   = useState('')
   const [team,   setTeam]   = useState('')
@@ -89,7 +90,11 @@ function Tracker() {
     try {
       const n = await importRows(rows)
       showToast(`✓ ${n} sites imported to Supabase`)
-    } catch (err) { const msg = err?.message || err?.details || err?.hint || JSON.stringify(err) || "Unknown error"; console.error("Import error:", err); showToast("Import failed: " + msg, "error") }
+    } catch (err) {
+      const msg = err?.message || err?.details || err?.hint || 'Unknown error'
+      console.error('Import error:', err)
+      showToast('Import failed: ' + msg, 'error')
+    }
   }
 
   async function handleExport() {
@@ -116,6 +121,7 @@ function Tracker() {
         onUpload={() => setModal('upload')}
         onConfig={() => setModal('config')}
         onExport={handleExport}
+        onWarehouse={onWarehouse}
         exporting={exporting}
         isLive
       />
