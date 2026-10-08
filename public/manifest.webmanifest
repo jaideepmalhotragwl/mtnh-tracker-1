@@ -1,0 +1,22 @@
+{
+  "name": "MTNH Portal",
+  "short_name": "MTNH",
+  "description": "Tower site tracker, team room and warehouse for Malhotra Tower Network Hub.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f9fafb",
+  "theme_color": "#1a56db",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Team Room", "url": "/?go=room",      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Tracker",   "url": "/?go=tracker",   "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Warehouse", "url": "/?go=warehouse", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+  ]
+}
