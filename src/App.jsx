@@ -8,6 +8,7 @@ import TeamRoom from './TeamRoom'
 import Gallery from './Gallery'
 import Warehouse from './Warehouse'
 import Settings from './Settings'
+import Bell from './Bell'
 
 // Which sections the vendor bar applies to. Team Room is deliberately
 // outside it: the team is seven people and splitting the conversation
@@ -48,6 +49,7 @@ export default function App() {
         </nav>
 
         <div className="whoami">
+          <Bell onGoToRoom={() => setView('room')} />
           <WhoAmI />
         </div>
       </header>

@@ -45,20 +45,36 @@ function People() {
   const toast = useToast()
   const gate = useAdminGate()
   const [adding, setAdding] = useState(false)
-  const [form, setForm] = useState({ name: '', initials: '', phone: '', colour: '#1a56db' })
+  const [form, setForm] = useState({ name: '', initials: '', email: '', phone: '', colour: '#1a56db' })
+  const [edit, setEdit] = useState({})   // id → the email being typed
 
   async function add() {
     if (!form.name.trim()) { toast('Name?', 'bad'); return }
     const { error } = await supabase.from('room_users').insert({
       name: form.name.trim(),
       initials: (form.initials || form.name.trim()[0]).toUpperCase(),
+      email: form.email.trim() || null,
       phone: form.phone || null,
       colour: form.colour
     })
     if (error) { toast(errLine(error), 'bad'); return }
     toast(`${form.name} added.`, 'good')
-    setForm({ name: '', initials: '', phone: '', colour: '#1a56db' })
+    setForm({ name: '', initials: '', email: '', phone: '', colour: '#1a56db' })
     setAdding(false)
+    reloadLists()
+  }
+
+  async function saveEmail(person) {
+    const value = (edit[person.id] ?? '').trim()
+    if (value && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)) {
+      toast("That doesn't look like an email address.", 'bad')
+      return
+    }
+    const { error } = await supabase.from('room_users')
+      .update({ email: value || null }).eq('id', person.id)
+    if (error) { toast(errLine(error), 'bad'); return }
+    toast(value ? `${person.name} will get email.` : `Email cleared for ${person.name}.`, 'good')
+    setEdit(e => { const n = { ...e }; delete n[person.id]; return n })
     reloadLists()
   }
 
@@ -87,6 +103,8 @@ function People() {
               <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
             <div><label>Initials</label>
               <input maxLength={2} value={form.initials} onChange={e => setForm({ ...form, initials: e.target.value })} /></div>
+            <div><label>Email</label>
+              <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
             <div><label>Phone</label>
               <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
             <div><label>Colour</label>
@@ -100,12 +118,15 @@ function People() {
         <table>
           <thead>
             <tr>
-              <th></th><th>Name</th><th>Phone</th>
+              <th></th><th>Name</th><th>Email</th><th>Phone</th>
               <th>Can request payment</th><th>Can pay</th><th>Admin</th><th></th>
             </tr>
           </thead>
           <tbody>
-            {people.map(p => (
+            {people.map(p => {
+              const typing = edit[p.id] !== undefined
+              const value = typing ? edit[p.id] : (p.email || '')
+              return (
               <tr key={p.id} className={p.active === false ? 'dim' : ''}>
                 <td>
                   <div className="av" style={{ background: p.colour || '#6b7280' }}>
@@ -115,6 +136,21 @@ function People() {
                 <td>
                   <b>{p.name}</b>
                   {p.active === false && <span className="tag" style={{ marginLeft: 6 }}>archived</span>}
+                </td>
+                <td style={{ minWidth: 230 }}>
+                  <div className="row" style={{ gap: 5 }}>
+                    <input
+                      type="email" placeholder="no email — gets no notifications"
+                      style={{ fontSize: 12, padding: '4px 7px' }}
+                      value={value}
+                      disabled={!gate.ok}
+                      onChange={e => setEdit(x => ({ ...x, [p.id]: e.target.value }))}
+                      onKeyDown={e => { if (e.key === 'Enter') saveEmail(p) }}
+                    />
+                    {typing && value !== (p.email || '') && (
+                      <button className="ok tiny" onClick={() => saveEmail(p)}>Save</button>
+                    )}
+                  </div>
                 </td>
                 <td className="sm">{p.phone || '—'}</td>
                 <td><Flag on={p.can_request_payment} disabled={!gate.ok} onClick={() => flip(p, 'can_request_payment')} /></td>
@@ -126,15 +162,23 @@ function People() {
                   </button>
                 </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>
 
       <div className="sm mut" style={{ marginTop: 10 }}>
-        Archiving keeps everything a person ever did. Their name stops showing
-        in the dropdowns, and their old messages, photos and payments stay
-        exactly where they are.
+        <b>Email.</b> A person with an address here is emailed when a task
+        lands on them, when it goes overdue, when a payment needs paying, and
+        when their own request is paid or declined. Leave it blank and they
+        simply get none — nothing else changes for them.
+      </div>
+
+      <div className="sm mut" style={{ marginTop: 6 }}>
+        <b>Archiving</b> keeps everything a person ever did. Their name stops
+        showing in the dropdowns, and their old messages, photos and payments
+        stay exactly where they are.
       </div>
     </>
   )

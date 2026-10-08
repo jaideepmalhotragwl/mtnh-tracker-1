@@ -35,6 +35,31 @@ export function findVendor(text, vendors) {
   return null
 }
 
+// ─────────────────────────────────────────────────────────────────
+// @NAME AT THE START MEANS A TASK
+//
+// "@Mohit check the DC for MP1004"  → a task for Mohit
+// "ask @Mohit about the DC"         → just a mention
+//
+// The position carries the meaning, which is a rule people pick up in
+// a day and which keeps every passing mention of a colleague from
+// turning into a to-do somebody has to go and close.
+// ─────────────────────────────────────────────────────────────────
+
+export function parseTaskCommand(text, people) {
+  const m = /^\s*@([A-Za-z][\w.-]*)\s+(.+)$/s.exec(text || '')
+  if (!m) return null
+
+  const typed = m[1].toLowerCase()
+  const person = people.find(p => p.name.toLowerCase() === typed)
+  if (!person) return null
+
+  const title = m[2].replace(/^[\s:–—-]+/, '').trim()
+  if (!title) return null
+
+  return { assignee: person.name, title }
+}
+
 export function findMentions(text, people) {
   if (!text) return []
   const out = new Set()
@@ -119,6 +144,12 @@ export function useRoom() {
       site_ids: siteIds, mentions
     }).select().single()
     if (error) throw new Error(errLine(error))
+
+    // Reload rather than wait for the realtime push. Other people's
+    // messages arrive over the socket, but your own must appear whether
+    // or not that socket is up — at a tower it often isn't, and typing
+    // into a feed that shows nothing back feels broken.
+    await load()
     return data
   }
 
@@ -143,6 +174,17 @@ export function useRoom() {
       status: 'done', completed_at: new Date().toISOString(), completed_by: by
     }).eq('id', task.id)
     if (error) throw new Error(errLine(error))
+    await load()
+  }
+
+  // A task made from chat has no date on it. Anyone can add one after,
+  // which is also what puts it in reach of the overdue reminder.
+  async function setTaskDue(task, dueDate) {
+    const { error } = await supabase.from('room_tasks')
+      .update({ due_date: dueDate || null, overdue_notified_at: null })
+      .eq('id', task.id)
+    if (error) throw new Error(errLine(error))
+    await load()
   }
 
   // A payment request. `siteSplits` is [{site_id, amount}] when the money
@@ -183,6 +225,7 @@ export function useRoom() {
       paid_mode: mode, receipt_url: receiptUrl || null
     }).eq('id', payment.id)
     if (error) throw new Error(errLine(error))
+    await load()
   }
 
   async function declinePayment(payment, { by, reason }) {
@@ -190,11 +233,12 @@ export function useRoom() {
       status: 'declined', paid_by: by, decline_reason: reason || null
     }).eq('id', payment.id)
     if (error) throw new Error(errLine(error))
+    await load()
   }
 
   return {
     messages, tasks, payments, splits, loading, error, reload: load,
-    send, addTask, closeTask, requestPayment, markPaid, declinePayment
+    send, addTask, closeTask, setTaskDue, requestPayment, markPaid, declinePayment
   }
 }
 

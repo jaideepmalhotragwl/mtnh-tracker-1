@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from './store'
 import { useToast } from './Toast'
-import { useRoom, useShift, findSiteIds, findVendor, findMentions, createSiteFromChat } from './useRoom'
+import { useRoom, useShift, findSiteIds, findVendor, findMentions, parseTaskCommand, createSiteFromChat } from './useRoom'
 import { normSiteId } from './useProjects'
 import MyDay from './MyDay'
 import { PhotoModal, TaskModal, PaymentModal, PayNowModal } from './RoomModals'
@@ -17,6 +17,7 @@ export default function TeamRoom({ sites, onOpenSite }) {
   const [modal, setModal] = useState(null) // photo | task | payment
   const [payNow, setPayNow] = useState(null)
   const bottom = useRef(null)
+  const box = useRef(null)
 
   const known = useMemo(
     () => new Set(sites.map(s => normSiteId(s.site_id))),
@@ -33,6 +34,22 @@ export default function TeamRoom({ sites, onOpenSite }) {
 
   const draftIds = findSiteIds(text)
   const draftVendor = findVendor(text, activeVendors)
+  const draftTask = parseTaskCommand(text, activePeople)
+
+  // The @ list, shown while someone is still typing a name at the start.
+  const picking = useMemo(() => {
+    const m = /^\s*@([A-Za-z][\w.-]*)?$/.exec(text)
+    if (!m) return null
+    const typed = (m[1] || '').toLowerCase()
+    const hits = activePeople.filter(p =>
+      p.name.toLowerCase().startsWith(typed) && p.name !== me)
+    return hits.length ? hits : null
+  }, [text, activePeople, me])
+
+  function pickPerson(name) {
+    setText(`@${name} `)
+    box.current?.focus()
+  }
 
   async function send() {
     const body = text.trim()
@@ -42,6 +59,25 @@ export default function TeamRoom({ sites, onOpenSite }) {
     const ids = findSiteIds(body)
     const vendor = findVendor(body, activeVendors)
     const mentions = findMentions(body, activePeople)
+
+    // Starts with @Name → a task, not just a line of chat. addTask posts
+    // its own message into the feed, so nothing is said twice.
+    const cmd = parseTaskCommand(body, activePeople)
+    if (cmd) {
+      try {
+        await room.addTask({
+          title: cmd.title,
+          assignedTo: cmd.assignee,
+          assignedBy: me,
+          siteId: ids[0] || null
+        })
+        setText('')
+        toast(`Task given to ${cmd.assignee}.`, 'good')
+      } catch (err) {
+        toast(err.message, 'bad')
+      }
+      return
+    }
 
     try {
       const msg = await room.send({ user: me, body, siteIds: ids, mentions })
@@ -151,6 +187,27 @@ export default function TeamRoom({ sites, onOpenSite }) {
         </div>
 
         <div className="composer">
+          {picking && (
+            <div className="picker">
+              {picking.map(p => (
+                <button key={p.name} className="pickrow" onClick={() => pickPerson(p.name)}>
+                  <span className="av" style={{ background: p.colour || '#6b7280' }}>
+                    {p.initials || p.name[0]}
+                  </span>
+                  <span className="b">{p.name}</span>
+                  <span className="right xs fnt">give them a task</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {draftTask && (
+            <div className="note info" style={{ marginBottom: 8, padding: '7px 10px' }}>
+              <b>Task for {draftTask.assignee}</b> — {draftTask.title}
+              <span className="xs"> · they get an email</span>
+            </div>
+          )}
+
           {(draftIds.length > 0 || draftVendor) && (
             <div className="chips">
               {draftIds.map(id => (
@@ -164,23 +221,31 @@ export default function TeamRoom({ sites, onOpenSite }) {
 
           <div className="composer-row">
             <textarea
+              ref={box}
               className="grow"
-              placeholder={me ? 'Say something. Site IDs and vendor names are picked up automatically.' : 'Pick your name in the top right first.'}
+              placeholder={me
+                ? 'Say something, or start with @name to give someone a task.'
+                : 'Pick your name in the top right first.'}
               value={text}
               disabled={!me}
               onChange={e => setText(e.target.value)}
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
+                if (e.key === 'Escape' && picking) setText('')
               }}
             />
-            <button className="pri" onClick={send} disabled={!me || !text.trim()}>Send</button>
+            <button className="pri" onClick={send} disabled={!me || !text.trim()}>
+              {draftTask ? 'Assign' : 'Send'}
+            </button>
           </div>
 
           <div className="row" style={{ marginTop: 8 }}>
             <button className="tiny" disabled={!me} onClick={() => setModal('photo')}>📷 Photos</button>
             <button className="tiny" disabled={!me} onClick={() => setModal('task')}>✓ Task</button>
             <button className="tiny" disabled={!me} onClick={() => setModal('payment')}>₹ Payment</button>
-            <span className="right xs fnt">Enter sends · Shift+Enter for a new line</span>
+            <span className="right xs fnt">
+              <b>@name</b> at the start makes a task · Enter sends
+            </span>
           </div>
         </div>
       </div>
@@ -273,18 +338,32 @@ function Message({ m, room, me, people, onOpenSite, onPay }) {
 
         {task && (
           <div className="card-in task">
-            <div className="hd">Task · {task.status === 'done' ? 'done' : 'open'}</div>
+            <div className="hd">
+              Task · {task.status === 'done' ? 'done' : overdue(task) ? 'overdue' : 'open'}
+            </div>
             <div className="row">
               <div className="grow">
                 <b>{task.title}</b>
-                <div className="xs mut">
-                  {task.assigned_to}{task.due_date ? ` · due ${task.due_date}` : ''}
-                </div>
+                <div className="xs mut">for {task.assigned_to}</div>
               </div>
               {task.status === 'open' && task.assigned_to === me && (
                 <button className="ok tiny" onClick={() => room.closeTask(task, me)}>Mark done</button>
               )}
             </div>
+
+            {task.status === 'open' && (
+              <div className="row xs" style={{ marginTop: 6 }}>
+                <span className="mut">Due</span>
+                <input
+                  type="date"
+                  style={{ width: 140, padding: '2px 6px', fontSize: 12 }}
+                  value={task.due_date || ''}
+                  onChange={e => room.setTaskDue(task, e.target.value)}
+                />
+                {overdue(task) && <span className="tag bad">past due</span>}
+                {!task.due_date && <span className="fnt">no reminder without one</span>}
+              </div>
+            )}
           </div>
         )}
 
@@ -340,6 +419,11 @@ function Message({ m, room, me, people, onOpenSite, onPay }) {
       </div>
     </div>
   )
+}
+
+function overdue(task) {
+  return task.status === 'open' && task.due_date &&
+         task.due_date < new Date().toISOString().slice(0, 10)
 }
 
 function time(ts) {

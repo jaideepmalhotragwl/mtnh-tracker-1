@@ -158,6 +158,69 @@ label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px
   color: #fff; font-size: 11px; font-weight: 600; flex: none;
 }
 
+/* ── the bell ──────────────────────────────────────────────── */
+
+.bellwrap { position: relative; }
+
+.bell {
+  position: relative; border: 1px solid var(--border); background: #fff;
+  width: 34px; height: 34px; border-radius: 8px; padding: 0;
+  display: grid; place-items: center;
+}
+.bellicon { font-size: 15px; line-height: 1; filter: grayscale(1); opacity: .7; }
+.bell:hover .bellicon { filter: none; opacity: 1; }
+
+.bellcount {
+  position: absolute; top: -6px; right: -6px;
+  min-width: 17px; height: 17px; padding: 0 4px;
+  border-radius: 9px; background: var(--blue); color: #fff;
+  font-size: 10px; font-weight: 700; line-height: 17px; text-align: center;
+  border: 2px solid #fff;
+}
+.bellcount.late { background: var(--red); }
+
+.belldot {
+  position: absolute; top: -2px; right: -2px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--blue); border: 2px solid #fff;
+}
+.belldot.sm-dot { position: static; border: none; width: 6px; height: 6px; flex: none; }
+
+.bellpanel {
+  position: absolute; top: 42px; right: 0; width: 330px; z-index: 60;
+  background: #fff; border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: var(--shadow-lg); overflow: hidden;
+}
+.bellhead {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 11px 14px; border-bottom: 1px solid var(--border); font-size: 13px;
+}
+.belllist { max-height: 340px; overflow-y: auto; }
+.bellempty { padding: 20px 14px; font-size: 13px; color: var(--muted); text-align: center; }
+
+.bellrow {
+  display: flex; align-items: flex-start; gap: 9px; width: 100%;
+  border: none; border-radius: 0; border-bottom: 1px solid var(--line);
+  padding: 9px 13px; text-align: left; background: #fff;
+}
+.bellrow:last-child { border-bottom: none; }
+.bellrow:hover { background: #fcfcfd; }
+
+.bellmark {
+  width: 20px; height: 20px; border-radius: 5px; flex: none; margin-top: 1px;
+  display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 700;
+}
+.bellrowt { display: block; font-size: 13px; font-weight: 500; }
+.bellrown {
+  display: block; font-size: 11px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.bellfoot {
+  padding: 9px 13px; border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--faint); background: #fcfcfd;
+}
+
 /* ── vendor bar ────────────────────────────────────────────── */
 
 .vbar {
@@ -343,6 +406,21 @@ input[type=file] { border: none; padding: 0; font-size: 12px; }
 .card-in .hd { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; margin-bottom: 4px; }
 
 .composer { border-top: 1px solid var(--border); padding: 12px 16px; background: #fff; }
+
+/* the @name list */
+.picker {
+  border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: var(--shadow-lg); background: #fff;
+  margin-bottom: 8px; overflow: hidden; max-height: 230px; overflow-y: auto;
+}
+.pickrow {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  border: none; border-radius: 0; padding: 8px 12px; text-align: left;
+  border-bottom: 1px solid var(--line); background: #fff;
+}
+.pickrow:last-child { border-bottom: none; }
+.pickrow:hover { background: #eef2ff; }
+
 .composer-row { display: flex; gap: 8px; align-items: flex-end; }
 .composer textarea { min-height: 42px; max-height: 140px; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
