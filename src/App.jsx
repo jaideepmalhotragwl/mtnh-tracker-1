@@ -9,6 +9,7 @@ import Gallery from './Gallery'
 import Warehouse from './Warehouse'
 import Settings from './Settings'
 import Bell from './Bell'
+import Install from './Install'
 
 // Which sections the vendor bar applies to. Team Room is deliberately
 // outside it: the team is seven people and splitting the conversation
@@ -17,7 +18,14 @@ const VENDOR_SCOPED = new Set(['tracker', 'warehouse'])
 
 export default function App() {
   const [authed, setAuthed] = useState(() => sessionStorage.getItem('mtnh_in') === '1')
-  const [view, setView] = useState('tracker')
+
+  // The home-screen icon has long-press shortcuts — Team Room, Tracker,
+  // Warehouse — and each opens with ?go= on the end.
+  const [view, setView] = useState(() => {
+    const want = new URLSearchParams(location.search).get('go')
+    return ['tracker', 'room', 'photos', 'warehouse', 'settings'].includes(want)
+      ? want : 'tracker'
+  })
   const [editing, setEditing] = useState(null)   // a site row, or {} for a new one
 
   const app = useApp()
@@ -37,6 +45,7 @@ export default function App() {
 
   return (
     <div className="shell">
+      <Install />
       <header className="top">
         <div className="brand">MTNH<span>Tower Network Hub</span></div>
 

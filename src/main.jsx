@@ -14,3 +14,14 @@ createRoot(document.getElementById('root')).render(
     </ToastProvider>
   </React.StrictMode>
 )
+
+// Lets the portal install to a phone's home screen and open without
+// signal. Registered after load so it never slows the first paint, and
+// only over https — on localhost it is skipped during development.
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // No offline shell. The portal works exactly as before.
+    })
+  })
+}

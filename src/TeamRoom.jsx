@@ -16,7 +16,7 @@ export default function TeamRoom({ sites, onOpenSite }) {
   const [asks, setAsks] = useState([])     // site IDs waiting for a yes/no
   const [modal, setModal] = useState(null) // photo | task | payment
   const [payNow, setPayNow] = useState(null)
-  const bottom = useRef(null)
+  const feed = useRef(null)
   const box = useRef(null)
 
   const known = useMemo(
@@ -28,8 +28,17 @@ export default function TeamRoom({ sites, onOpenSite }) {
     [sites]
   )
 
+  // Scroll the feed, not the page.
+  //
+  // scrollIntoView walks up and scrolls every ancestor that can move,
+  // and on a phone — where My Day sits below the feed and the document
+  // is taller than the screen — that scrolled the window instead,
+  // carrying the whole conversation up off the top. Setting scrollTop
+  // on the feed itself can only ever move the feed.
   useEffect(() => {
-    bottom.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = feed.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
   }, [room.messages.length, asks.length])
 
   const draftIds = findSiteIds(text)
@@ -133,7 +142,7 @@ export default function TeamRoom({ sites, onOpenSite }) {
   return (
     <div className="room">
       <div className="feed">
-        <div className="feed-body">
+        <div className="feed-body" ref={feed}>
           {room.loading && <div className="mut sm">Loading the room…</div>}
           {room.error && <div className="note badN">{room.error}</div>}
 
@@ -183,7 +192,6 @@ export default function TeamRoom({ sites, onOpenSite }) {
             </div>
           ))}
 
-          <div ref={bottom} />
         </div>
 
         <div className="composer">

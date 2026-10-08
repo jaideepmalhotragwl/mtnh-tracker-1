@@ -454,17 +454,59 @@ input[type=file] { border: none; padding: 0; font-size: 12px; }
 .toast.bad { background: var(--red); }
 .toast.good{ background: var(--green); }
 
+/* ── install prompt ────────────────────────────────────────── */
+
+.installbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+  background: #eef2ff; border-bottom: 1px solid #c7d2fe;
+}
+
 /* ── phone ─────────────────────────────────────────────────── */
 
 @media (max-width: 760px) {
-  .top { padding: 0 12px; gap: 8px; height: auto; min-height: 52px; flex-wrap: wrap; padding-top: 8px; padding-bottom: 8px; }
+  /* installed to a home screen, the app owns the notch and the bar at
+     the foot of the screen, so it has to keep clear of both itself */
+  .top {
+    padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
+    gap: 8px; height: auto; min-height: 52px; flex-wrap: wrap;
+  }
+  .brand span { display: none; }
   .vbar { top: 0; position: static; padding: 8px 12px; }
-  .nav { order: 3; width: 100%; overflow-x: auto; margin-left: 0; }
+  .nav {
+    order: 3; width: 100%; margin-left: 0;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav button { white-space: nowrap; }
   .whoami { margin-left: auto; }
-  .page { padding: 12px; }
+  .whoami select { min-width: 0; max-width: 118px; }
+
+  .page { padding: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+
+  /* Stacked on a phone, the feed has no height of its own to flex
+     into and collapses to nothing — you get the composer sitting on
+     top of My Day and no messages at all. Give it a floor. */
   .room { flex-direction: column; }
-  .feed { border-right: none; }
+  .feed { border-right: none; min-height: 70vh; }
+  .feed-body { min-height: 0; }
   .side { width: auto; border-top: 1px solid var(--border); }
+  .composer { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
   .lane { width: 84vw; }
+  .modal { max-height: 100%; }
   .modal-b { padding: 14px; }
+  .modal-f { padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+  .scrim { padding: 12px 8px; }
+
+  /* the bell panel is nearly the width of a phone, so pin it to the
+     screen rather than letting it hang off the right edge */
+  .bellpanel { position: fixed; top: auto; right: 8px; left: 8px; width: auto; }
+
+  .tiles { grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 8px; }
+  .tile { padding: 10px 11px; }
+  .tile .v { font-size: 20px; }
+
+  /* 16px keeps iOS from zooming the whole page when a field is tapped */
+  input, select, textarea { font-size: 16px; }
 }
