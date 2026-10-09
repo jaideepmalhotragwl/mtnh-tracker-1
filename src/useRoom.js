@@ -179,11 +179,23 @@ export function useRoom() {
 
   // A task made from chat has no date on it. Anyone can add one after,
   // which is also what puts it in reach of the overdue reminder.
+  //
+  // The date is written on its own. Clearing overdue_notified_at is a
+  // separate, best-effort call because that column only exists once the
+  // email setup has been run — bundling the two meant that on a database
+  // without it the whole update was rejected and the date silently
+  // refused to save.
   async function setTaskDue(task, dueDate) {
     const { error } = await supabase.from('room_tasks')
-      .update({ due_date: dueDate || null, overdue_notified_at: null })
+      .update({ due_date: dueDate || null })
       .eq('id', task.id)
     if (error) throw new Error(errLine(error))
+
+    // Lets the overdue reminder fire again against the new date. If the
+    // column isn't there yet, the date still stands.
+    await supabase.from('room_tasks')
+      .update({ overdue_notified_at: null }).eq('id', task.id)
+
     await load()
   }
 

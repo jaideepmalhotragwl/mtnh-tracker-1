@@ -274,7 +274,10 @@ export default function TeamRoom({ sites, onOpenSite }) {
                 </div>
               </div>
               {t.assigned_to === me && (
-                <button className="tiny" onClick={() => room.closeTask(t, me)}>Done</button>
+                <button className="tiny" onClick={async () => {
+                  try { await room.closeTask(t, me); toast('Task closed.', 'good') }
+                  catch (err) { toast(err.message, 'bad') }
+                }}>Done</button>
               )}
             </div>
           ))}
@@ -314,6 +317,7 @@ export default function TeamRoom({ sites, onOpenSite }) {
 // ── one message ──────────────────────────────────────────────────
 
 function Message({ m, room, me, people, onOpenSite, onPay }) {
+  const toast = useToast()
   const who = people.find(p => p.name === m.user_name)
   const task    = m.kind === 'task'    ? room.tasks.find(t => t.id === m.ref_id) : null
   const payment = m.kind === 'payment' ? room.payments.find(p => p.id === m.ref_id) : null
@@ -355,7 +359,10 @@ function Message({ m, room, me, people, onOpenSite, onPay }) {
                 <div className="xs mut">for {task.assigned_to}</div>
               </div>
               {task.status === 'open' && task.assigned_to === me && (
-                <button className="ok tiny" onClick={() => room.closeTask(task, me)}>Mark done</button>
+                <button className="ok tiny" onClick={async () => {
+                  try { await room.closeTask(task, me); toast('Task closed.', 'good') }
+                  catch (err) { toast(err.message, 'bad') }
+                }}>Mark done</button>
               )}
             </div>
 
@@ -366,7 +373,15 @@ function Message({ m, room, me, people, onOpenSite, onPay }) {
                   type="date"
                   style={{ width: 140, padding: '2px 6px', fontSize: 12 }}
                   value={task.due_date || ''}
-                  onChange={e => room.setTaskDue(task, e.target.value)}
+                  onChange={async e => {
+                    const v = e.target.value
+                    try {
+                      await room.setTaskDue(task, v)
+                      toast(v ? `Due ${v}.` : 'Due date cleared.', 'good')
+                    } catch (err) {
+                      toast(err.message, 'bad')
+                    }
+                  }}
                 />
                 {overdue(task) && <span className="tag bad">past due</span>}
                 {!task.due_date && <span className="fnt">no reminder without one</span>}
