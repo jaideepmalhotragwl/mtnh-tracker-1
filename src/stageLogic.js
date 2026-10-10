@@ -14,40 +14,107 @@ export function isYes(v) {
   return ['yes', 'y', 'done', 'true', '1', 'complete', 'completed', 'received', 'ok'].includes(s)
 }
 
+const pad = n => String(n).padStart(2, '0')
+
+// A real calendar date, or nothing. Month 25 must never reach the
+// database — the whole import fails on it, and a silently wrong date is
+// worse than a missing one.
+function ymd(y, m, d) {
+  if (!(y >= 1990 && y <= 2100)) return ''
+  if (!(m >= 1 && m <= 12)) return ''
+  if (!(d >= 1 && d <= 31)) return ''
+  const probe = new Date(Date.UTC(y, m - 1, d))
+  if (probe.getUTCMonth() !== m - 1 || probe.getUTCDate() !== d) return ''  // 31 Feb
+  return `${y}-${pad(m)}-${pad(d)}`
+}
+
+const DMY = /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/
+
+// Which way round a column writes its dates.
+//
+// 5/25/26 can only be month-first; 25/5/26 can only be day-first. Scan
+// the whole column for a value that settles it and apply that to the
+// ambiguous ones. Deciding per value would read 5/6 one way and 25/6 the
+// other in the same column.
+export function detectDateOrder(values) {
+  let dmy = 0, mdy = 0
+  for (const v of values) {
+    if (v instanceof Date) continue
+    const m = DMY.exec(String(v ?? '').trim())
+    if (!m) continue
+    const a = +m[1], b = +m[2]
+    if (a > 12 && b <= 12) dmy++
+    else if (b > 12 && a <= 12) mdy++
+  }
+  if (mdy > dmy) return 'mdy'
+  if (dmy > mdy) return 'dmy'
+  return null      // nothing in the column settles it
+}
+
 // A date column in these sheets can hold almost anything — "Not Issue",
 // a note about an antenna, a serial number. Anything that isn't a date
-// becomes blank rather than crashing the import.
-export function parseDate(v) {
+// becomes blank rather than failing the import.
+//
+// `order` is what detectDateOrder worked out for this column. Without
+// it, ambiguous values fall back to day-first, which is how the Indian
+// sheets are written.
+export function parseDate(v, order) {
   if (v === null || v === undefined) return ''
+
+  // A date cell read as a serial number — the only form that means the
+  // same thing in every timezone, which is why the importer asks for it.
+  if (typeof v === 'number') return fromSerial(v)
+
+  // A Date object, if one reaches us anyway. The spreadsheet library
+  // hands back 23:59:50 on the day BEFORE when the browser is at +05:30,
+  // so neither its local nor its UTC parts can be trusted: shift it to
+  // local and snap to the nearest midnight before reading it.
   if (v instanceof Date) {
     if (isNaN(v.getTime())) return ''
-    return v.toISOString().slice(0, 10)
+    const local = v.getTime() - v.getTimezoneOffset() * 60000
+    const snapped = new Date(Math.round(local / 86400000) * 86400000)
+    return ymd(snapped.getUTCFullYear(), snapped.getUTCMonth() + 1, snapped.getUTCDate())
   }
+
   const s = String(v).trim()
   if (NOT_A_VALUE.has(s.toLowerCase())) return ''
 
-  if (/^\d{1,2}\/\d{1,2}\/\d{2}$/.test(s)) {
-    const [d, m, y] = s.split('/')
-    return `20${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+  // already the way the database wants it
+  const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s)
+  if (iso) return ymd(+iso[1], +iso[2], +iso[3])
+
+  const m = DMY.exec(s)
+  if (m) {
+    const a = +m[1], b = +m[2]
+    let y = +m[3]
+    if (y < 100) y += 2000
+
+    let day, mon
+    if (a > 12 && b <= 12)      { day = a; mon = b }   // can only be day-first
+    else if (b > 12 && a <= 12) { day = b; mon = a }   // can only be month-first
+    else if (order === 'mdy')   { day = b; mon = a }
+    else                        { day = a; mon = b }
+    return ymd(y, mon, day)
   }
-  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
-    const [d, m, y] = s.split('/')
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
-  }
-  if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(s)) {
-    const [d, m, y] = s.split('-')
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
-  }
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10)
 
   // Text in a date column. Let it go rather than guess.
   if (/[a-zA-Z]/.test(s)) return ''
 
-  const dt = new Date(s)
-  if (!isNaN(dt.getTime()) && dt.getFullYear() > 2000 && dt.getFullYear() < 2100) {
-    return dt.toISOString().slice(0, 10)
-  }
+  // An Excel serial that arrived as text.
+  if (/^\d{4,5}(\.\d+)?$/.test(s)) return fromSerial(Number(s))
+
   return ''
+}
+
+// Excel day number to a calendar date. Pure arithmetic in UTC, so the
+// answer does not depend on where the person running the import is.
+// Day 1 is 1 Jan 1900, and Excel wrongly believes 1900 was a leap year,
+// which is why the epoch is 30 Dec 1899.
+function fromSerial(serial) {
+  const n = Math.round(Number(serial))
+  if (!(n > 20000 && n < 60000)) return ''      // outside ~1954 to ~2064
+  const dt = new Date(Date.UTC(1899, 11, 30) + n * 86400000)
+  return ymd(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate())
 }
 
 // ─────────────────────────────────────────────────────────────────

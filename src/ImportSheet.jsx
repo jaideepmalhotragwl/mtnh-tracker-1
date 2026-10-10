@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import * as XLSX from 'xlsx'
-import { parseDate } from './stageLogic'
+import { parseDate, detectDateOrder } from './stageLogic'
 import { useApp, resolveVendor } from './store'
 import { useToast } from './Toast'
 import { useEscape } from './useEscape'
@@ -40,7 +40,7 @@ const MAP = [
   ['lock_status',             ['lockstatus', 'lock']],
   ['ptw_no',                  ['ptwno', 'ptw', 'ptwnumber']],
   ['team_name',               ['teamname', 'team', 'vendorteam']],
-  ['team_number',             ['teamnumber', 'teamno', 'teamcontact', 'contactno', 'mobile']],
+  ['team_number',             ['teamnumber', 'teamno', 'teamnumb', 'teamcontact', 'contactno', 'mobile']],
   ['email_received_date',     ['emailreceiveddate', 'emaildate', 'receiveddate']],
   ['listed_on_ultro',         ['listedonultro', 'ultrolisted', 'ultro', 'listed']],
   ['team_assigned',           ['teamassigned', 'assigned']],
@@ -97,6 +97,7 @@ const MAP = [
   ['tower_height',            ['towerheight']],
   ['antenna_height',          ['antennaheight']],
   ['clamp_details',           ['clampdetails', 'clamp']],
+  ['billing_status',          ['billingstatus', 'billing']],
   ['remarks',                 ['remarks', 'remark', 'comments', 'note', 'notes']]
 ]
 
@@ -121,7 +122,7 @@ export default function ImportSheet({ onClose, importRows, reload }) {
     if (!f) return
     try {
       const buf = await f.arrayBuffer()
-      const wb = XLSX.read(buf, { cellDates: true })
+      const wb = XLSX.read(buf)
       setSheets({ wb, names: wb.SheetNames, fileName: f.name })
       setPick(wb.SheetNames[0] || '')
       setPrev(null)
@@ -133,17 +134,43 @@ export default function ImportSheet({ onClose, importRows, reload }) {
   function build() {
     if (!sheets || !pick) return
     const ws = sheets.wb.Sheets[pick]
-    const raw = XLSX.utils.sheet_to_json(ws, { defval: '', raw: false, cellDates: true })
+    // cellDates is deliberately OFF. With it on, the library returns a
+    // Date that reads as the previous day for anyone in India, because it
+    // lands ten seconds short of midnight. The serial number underneath
+    // means the same thing everywhere, so dates are converted here.
+    const raw = XLSX.utils.sheet_to_json(ws, { defval: '', raw: true, cellDates: false })
 
     const unknown = new Set()
     const rows = []
+
+    // Work out each date column's convention from the whole column
+    // before parsing any of it. 5/6/26 is unreadable on its own; 25/6/26
+    // somewhere else in the same column settles it for all of them.
+    const order = {}
+    for (const header of new Set(raw.flatMap(r => Object.keys(r)))) {
+      const col = HEADER_TO_COL[squash(header)]
+      if (!col || !DATE_FIELDS.has(col)) continue
+      order[col] = detectDateOrder(raw.map(r => r[header]))
+    }
+
+    const dropped = new Map()   // column -> the values that were not dates
 
     for (const r of raw) {
       const out = { source_sheet: pick, updated_by: me || 'import' }
       for (const [header, value] of Object.entries(r)) {
         const col = HEADER_TO_COL[squash(header)]
         if (!col) { if (String(header).trim()) unknown.add(String(header).trim()); continue }
-        out[col] = DATE_FIELDS.has(col) ? parseDate(value) : String(value ?? '').trim()
+        if (DATE_FIELDS.has(col)) {
+          const got = parseDate(value, order[col])
+          const had = String(value ?? '').trim()
+          if (!got && had && !/^(-|na|n\/a|nil|none)$/i.test(had)) {
+            if (!dropped.has(col)) dropped.set(col, new Set())
+            if (dropped.get(col).size < 4) dropped.get(col).add(had)
+          }
+          out[col] = got
+        } else {
+          out[col] = String(value ?? '').trim()
+        }
       }
       if (!out.site_id) continue
 
@@ -156,7 +183,7 @@ export default function ImportSheet({ onClose, importRows, reload }) {
       rows.push(out)
     }
 
-    setPrev({ rows, unknown: [...unknown], sheet: pick })
+    setPrev({ rows, unknown: [...unknown], sheet: pick, order, dropped })
   }
 
   async function run() {
@@ -219,6 +246,26 @@ export default function ImportSheet({ onClose, importRows, reload }) {
               <div className={`note ${preview.rows.length ? 'okN' : 'badN'}`} style={{ marginTop: 14 }}>
                 <b>{preview.rows.length}</b> rows with a Site ID, ready to import from <b>{preview.sheet}</b>.
               </div>
+
+              {preview.dropped?.size > 0 && (
+                <div className="note warnN">
+                  <b>Values that were not dates</b>, left blank rather than guessed:
+                  <div className="sm" style={{ marginTop: 6 }}>
+                    {[...preview.dropped.entries()].map(([col, vals]) => (
+                      <div key={col}>
+                        <span className="mono">{col}</span> — {[...vals].join(', ')}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {Object.entries(preview.order || {}).some(([, o]) => o === 'mdy') && (
+                <div className="note info">
+                  This sheet writes dates <b>month first</b> (5/25/26 is 25 May).
+                  Read that way. Check the Work date column below looks right.
+                </div>
+              )}
 
               {preview.unknown.length > 0 && (
                 <div className="note warnN">
