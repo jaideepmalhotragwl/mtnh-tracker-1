@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from './store'
 import { useToast } from './Toast'
-import { useRoom, useShift, findSiteIds, findVendor, findMentions, parseTaskCommand, createSiteFromChat } from './useRoom'
+import { useRoom, useShift, findSiteIds, findVendor, findMentions, parseTaskCommand, parseSiteBatch, applySiteBatch } from './useRoom'
 import { normSiteId } from './useProjects'
 import MyDay from './MyDay'
 import { PhotoModal, TaskModal, PaymentModal, PayNowModal } from './RoomModals'
 
 export default function TeamRoom({ sites, onOpenSite }) {
-  const { me, activePeople, activeVendors } = useApp()
+  const { me, activePeople, activeVendors, vendor: appVendor } = useApp()
   const room = useRoom()
   const shift = useShift(me)
   const toast = useToast()
@@ -16,6 +16,7 @@ export default function TeamRoom({ sites, onOpenSite }) {
   const [asks, setAsks] = useState([])     // site IDs waiting for a yes/no
   const [modal, setModal] = useState(null) // photo | task | payment
   const [payNow, setPayNow] = useState(null)
+  const [busy, setBusy] = useState(null)
   const feed = useRef(null)
   const box = useRef(null)
 
@@ -92,17 +93,22 @@ export default function TeamRoom({ sites, onOpenSite }) {
       const msg = await room.send({ user: me, body, siteIds: ids, mentions })
       setText('')
 
-      // A site ID nobody has heard of. Ask — never create silently. The
-      // earlier build created things from loose text and filled up with
-      // junk, so this one always shows a card first.  (R2, Q2)
-      const unknown = ids.filter(id => !known.has(id))
-      if (unknown.length) {
-        setAsks(a => [
-          ...a,
-          ...unknown.map(id => ({
-            id, vendor: vendor || '', messageId: msg.id, key: `${msg.id}:${id}`
-          }))
-        ])
+      // Site IDs in the message. Ask — never create silently. The earlier
+      // build created things from loose text and filled a database with
+      // junk, so this always shows a card first.  (R2, Q2)
+      //
+      // One card for the whole message, not one per site: a day's list
+      // is six or seven lines and six separate cards is unusable.
+      const batch = parseSiteBatch(body)
+      if (batch.length) {
+        setAsks(a => [...a, {
+          key: msg.id,
+          messageId: msg.id,
+          items: batch.map(x => ({ ...x, exists: known.has(x.id) })),
+          vendor: vendor || (appVendor !== 'All' && appVendor !== 'Unassigned' ? appVendor : ''),
+          team: '',
+          workToday: false
+        }])
       }
     } catch (err) {
       toast(err.message, 'bad')
@@ -111,29 +117,39 @@ export default function TeamRoom({ sites, onOpenSite }) {
 
   async function confirmAsk(ask) {
     if (!ask.vendor) { toast('Pick the vendor first.', 'bad'); return }
+    setBusy(ask.key)
     try {
-      const r = await createSiteFromChat({
-        siteId: ask.id, vendor: ask.vendor, user: me, messageId: ask.messageId
+      const r = await applySiteBatch({
+        items: ask.items, vendor: ask.vendor, team: ask.team,
+        workToday: ask.workToday, user: me
       })
-      if (r.status === 'created') {
-        toast(`${ask.id} added under ${ask.vendor}.`, 'good')
+
+      const bits = []
+      if (r.created.length) bits.push(`${r.created.length} added`)
+      if (r.updated.length) bits.push(`${r.updated.length} updated`)
+      if (r.failed.length)  bits.push(`${r.failed.length} failed`)
+
+      if (r.created.length || r.updated.length) {
         await room.send({
-          user: me, kind: 'site_created', siteIds: [ask.id],
-          body: `${ask.id} added to the tracker under ${ask.vendor}`
+          user: me, kind: 'site_created',
+          siteIds: [...r.created, ...r.updated],
+          body: `${bits.join(', ')} under ${ask.vendor}` +
+                (ask.workToday ? ' · work marked started today' : '')
         })
-      } else if (r.status === 'exists') {
-        // One site ID = one site. We say where it already is rather than
-        // making a second copy under a different vendor.  (Q4)
-        toast(`${ask.id} is already in the tracker under ${r.vendor}.`, 'bad')
-      } else if (r.status === 'bad_vendor') {
-        toast(`"${ask.vendor}" isn't a vendor we know.`, 'bad')
-      } else {
-        toast('Could not add that one.', 'bad')
       }
+      if (r.failed.length) toast(r.failed[0], 'bad')
+      else toast(`${bits.join(', ')}.`, 'good')
+
       setAsks(a => a.filter(x => x.key !== ask.key))
     } catch (err) {
       toast(err.message, 'bad')
+    } finally {
+      setBusy(null)
     }
+  }
+
+  function patchAsk(key, patch) {
+    setAsks(a => a.map(x => x.key === key ? { ...x, ...patch } : x))
   }
 
   const openTasks    = room.tasks.filter(t => t.status === 'open')
@@ -165,32 +181,82 @@ export default function TeamRoom({ sites, onOpenSite }) {
             />
           ))}
 
-          {asks.map(ask => (
+          {asks.map(ask => {
+            const cities = [...new Set(ask.items.map(i => i.city || '—'))]
+            const nNew = ask.items.filter(i => !i.exists).length
+            const nOld = ask.items.length - nNew
+            return (
             <div className="msg" key={ask.key}>
               <div className="av" style={{ background: '#c27803' }}>?</div>
               <div className="body">
                 <div className="card-in ask">
-                  <div className="hd">New site ID</div>
-                  <div>
-                    <b className="mono">{ask.id}</b> isn't in the tracker.
-                    Add it and I'll link your message to it.
+                  <div className="hd">
+                    {ask.items.length} site{ask.items.length > 1 ? 's' : ''} in this message
                   </div>
-                  <div className="row wrap" style={{ marginTop: 8 }}>
-                    <select style={{ width: 130 }} value={ask.vendor}
-                            onChange={e => setAsks(a => a.map(x =>
-                              x.key === ask.key ? { ...x, vendor: e.target.value } : x))}>
+
+                  <div className="batch">
+                    {cities.map(c => (
+                      <div className="bcity" key={c}>
+                        <div className="bcity-n">{c}</div>
+                        <div className="bids">
+                          {ask.items.filter(i => (i.city || '—') === c).map(i => (
+                            <span key={i.id} className={`tag ${i.exists ? '' : 'good'}`}>
+                              {i.id}{i.exists ? ' · already in' : ''}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="sm mut" style={{ marginTop: 8 }}>
+                    {nNew > 0 && `${nNew} to add`}
+                    {nNew > 0 && nOld > 0 && ' · '}
+                    {nOld > 0 && `${nOld} already in the tracker, city and team will be updated`}
+                  </div>
+
+                  <div className="row wrap" style={{ marginTop: 10, gap: 8 }}>
+                    <select style={{ width: 120 }} value={ask.vendor}
+                            onChange={e => patchAsk(ask.key, { vendor: e.target.value })}>
                       <option value="">Vendor…</option>
                       {activeVendors.map(v => <option key={v.name} value={v.name}>{v.name}</option>)}
                     </select>
-                    <button className="ok tiny" onClick={() => confirmAsk(ask)}>Add to tracker</button>
-                    <button className="ghost tiny" onClick={() => setAsks(a => a.filter(x => x.key !== ask.key))}>
-                      Not a site
+                    <input
+                      style={{ width: 150 }} list="batch-people" placeholder="Team (optional)"
+                      value={ask.team}
+                      onChange={e => patchAsk(ask.key, { team: e.target.value })} />
+                    <datalist id="batch-people">
+                      {activePeople.map(p => <option key={p.name} value={p.name} />)}
+                    </datalist>
+                  </div>
+
+                  <label className="chk sm" style={{ marginTop: 10 }}>
+                    <input type="checkbox" checked={ask.workToday}
+                           onChange={e => patchAsk(ask.key, { workToday: e.target.checked })} />
+                    Mark work started today
+                  </label>
+                  {ask.workToday && (
+                    <div className="xs mut" style={{ marginLeft: 24 }}>
+                      Moves them to Work Initiated. They will show as needing
+                      dismantle photos until someone uploads them.
+                    </div>
+                  )}
+
+                  <div className="row wrap" style={{ marginTop: 10, gap: 8 }}>
+                    <button className="ok tiny" disabled={busy === ask.key}
+                            onClick={() => confirmAsk(ask)}>
+                      {busy === ask.key ? 'Working…' : 'Add to tracker'}
+                    </button>
+                    <button className="ghost tiny" disabled={busy === ask.key}
+                            onClick={() => setAsks(a => a.filter(x => x.key !== ask.key))}>
+                      Not sites
                     </button>
                   </div>
                 </div>
               </div>
             </div>
-          ))}
+            )
+          })}
 
         </div>
 

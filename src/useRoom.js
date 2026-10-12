@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase, errLine } from './supabase'
 import { resolveVendor } from './store'
+import { normSiteId } from './useProjects'
 
 // ─────────────────────────────────────────────────────────────────
 // READING A SITE ID OUT OF A SENTENCE  (R2)
@@ -24,6 +25,119 @@ export function findSiteIds(text) {
   SITE_ID_RE.lastIndex = 0
   while ((m = SITE_ID_RE.exec(up)) !== null) hits.add(m[1])
   return [...hits]
+}
+
+// ─────────────────────────────────────────────────────────────────
+// A WHOLE DAY'S LIST, PASTED IN
+//
+//   This sites we have to do today -Gwalior
+//   MC3375
+//   MPGW3559
+//
+//   Katni
+//   MC506
+//
+// A line carrying site IDs belongs to whichever place was named above
+// it. A line carrying none names the next place. The city is whatever
+// follows the last dash or colon, so the prose in front of it is
+// ignored — people do not write headings, they write sentences.
+// ─────────────────────────────────────────────────────────────────
+
+function cityFrom(line) {
+  let t = line.replace(/[•*>#]+/g, ' ').trim()
+  const cut = Math.max(t.lastIndexOf('-'), t.lastIndexOf(':'), t.lastIndexOf('–'))
+  if (cut !== -1) t = t.slice(cut + 1)
+  t = t.replace(/[^\w\s&.()/-]/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!t) return null
+
+  // Still a sentence? Take the last word, which is where the place sits
+  // in "sites we have to do today Gwalior".
+  const words = t.split(' ')
+  if (words.length > 3) t = words[words.length - 1]
+  if (t.length < 2 || t.length > 40) return null
+  if (/^\d+$/.test(t)) return null
+  return t.replace(/\b\w/g, c => c.toUpperCase())
+}
+
+export function parseSiteBatch(text) {
+  const out = []
+  const seen = new Set()
+  let city = null
+
+  for (const rawLine of String(text || '').split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line) continue
+
+    const ids = findSiteIds(line)
+
+    if (ids.length === 0) {
+      const c = cityFrom(line)
+      if (c) city = c
+      continue
+    }
+
+    // A line can carry both, as in "Gwalior - MC3375". Whatever is left
+    // once the IDs are removed names the place.
+    let rest = line.toUpperCase()
+    for (const id of ids) rest = rest.split(id).join(' ')
+    const c = cityFrom(rest)
+    if (c) city = c
+
+    for (const id of ids) {
+      if (seen.has(id)) continue
+      seen.add(id)
+      out.push({ id, city })
+    }
+  }
+  return out
+}
+
+// Today, from the clock on the wall rather than UTC. At +05:30 an
+// toISOString() before half past five in the morning gives yesterday.
+export function todayLocal() {
+  const d = new Date()
+  const p = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+// Write the batch. New sites are created; ones already in the tracker
+// have their city, team and vendor brought up to date.
+export async function applySiteBatch({ items, vendor, team, workToday, user }) {
+  const ids = items.map(i => normSiteId(i.id)).filter(Boolean)
+  if (!ids.length) return { created: 0, updated: 0, failed: [] }
+
+  const { data: existing, error: exErr } = await supabase
+    .from('projects').select('id, site_id').in('site_id', ids)
+  if (exErr) throw new Error(errLine(exErr))
+
+  const rowIdOf = new Map((existing || []).map(r => [normSiteId(r.site_id), r.id]))
+  const today = todayLocal()
+
+  const work = workToday ? { work_initiated: 'Yes', work_date: today } : {}
+  const created = [], updated = [], failed = []
+
+  for (const it of items) {
+    const site_id = normSiteId(it.id)
+    if (!site_id) continue
+
+    const fields = {
+      vendor,
+      updated_by: user,
+      ...(it.city ? { city: it.city } : {}),
+      ...(team ? { team_name: team } : {}),
+      ...work
+    }
+
+    const rowId = rowIdOf.get(site_id)
+    const res = rowId
+      ? await supabase.from('projects').update(fields).eq('id', rowId)
+      : await supabase.from('projects').insert({ site_id, ...fields })
+
+    if (res.error) failed.push(`${site_id}: ${errLine(res.error)}`)
+    else (rowId ? updated : created).push(site_id)
+  }
+
+  return { created, updated, failed }
 }
 
 export function findVendor(text, vendors) {
