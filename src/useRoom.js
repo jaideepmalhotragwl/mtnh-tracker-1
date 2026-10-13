@@ -389,6 +389,16 @@ export function useRoom() {
     return { refWarning }
   }
 
+  // A request that went out without a QR. Whoever has the picture — the
+  // payer, usually, after asking on WhatsApp — attaches it to the request
+  // so it is there for the record and for anyone paying the same person.
+  async function setPaymentQr(payment, qrUrl) {
+    const { error } = await supabase.from('room_payments')
+      .update({ qr_url: qrUrl }).eq('id', payment.id)
+    if (error) throw new Error(errLine(error))
+    await load()
+  }
+
   async function declinePayment(payment, { by, reason }) {
     const { error } = await supabase.from('room_payments').update({
       status: 'declined', paid_by: by, decline_reason: reason || null
@@ -399,7 +409,7 @@ export function useRoom() {
 
   return {
     messages, tasks, payments, splits, loading, error, reload: load,
-    send, addTask, closeTask, setTaskDue, requestPayment, markPaid, declinePayment
+    send, addTask, closeTask, setTaskDue, requestPayment, markPaid, declinePayment, setPaymentQr
   }
 }
 

@@ -517,10 +517,14 @@ function Message({ m, room, me, people, onOpenSite, onPay }) {
               </div>
             )}
 
-            {payment.status === 'pending' && payment.qr_url && (
-              <a className="xs" href={payment.qr_url} target="_blank" rel="noreferrer">
-                QR code for {payment.pay_to_name || 'the payee'}
-              </a>
+            {payment.status === 'pending' && (
+              payment.qr_url
+                ? <img className="qr-thumb" style={{ marginTop: 8 }} src={payment.qr_url}
+                       alt="QR code" title="Tap Pay to scan it full size"
+                       onClick={() => onPay(payment)} />
+                : <span className="tag warn" style={{ marginTop: 8, display: 'inline-block' }}>
+                    no QR yet — attach it when paying
+                  </span>
             )}
           </div>
         )}

@@ -205,6 +205,14 @@ export function PaymentModal({ sites, onClose, room }) {
     if (mode === 'split' && !rows.some(r => r.site_id && Number(r.amount) > 0)) {
       toast('A split needs at least one site with an amount.', 'bad'); return
     }
+    // The person paying scans this. A request without a QR lands on
+    // Deepak's screen with nothing to scan, so it is stopped here, while
+    // the person who has the QR is still holding the phone.
+    if (!picked?.qr_url && !qr) {
+      toast('Attach the QR code — whoever pays has to scan it.', 'bad'); return
+    }
+    if (!typing && !picked) { toast('Who is being paid?', 'bad'); return }
+
     setBusy(true)
     try {
       let qrUrl   = picked?.qr_url || null
@@ -212,8 +220,16 @@ export function PaymentModal({ sites, onClose, room }) {
       let upiId   = picked?.upi_id || upi.trim()   || null
       let savedId = picked?.id     || null
 
-      if (typing && qr) {
-        qrUrl = await uploadRaw(qr, 'payment-qr').catch(() => null)
+      // A failed upload used to be swallowed, and the request went out
+      // with no QR on it. Now it stops and says so.
+      if (qr) {
+        try {
+          qrUrl = await uploadRaw(qr, 'payment-qr')
+        } catch (err) {
+          throw new Error(`The QR code didn't upload — ${err.message}. Try again.`)
+        }
+        // A saved payee who had no QR gets this one for next time.
+        if (picked && !picked.qr_url) await book.fillIn(picked, { qr_url: qrUrl })
       }
 
       // A new payee with a QR is worth keeping. Next month nobody has to
@@ -298,7 +314,7 @@ export function PaymentModal({ sites, onClose, room }) {
 
         {!typing && (
           <>
-            <select value={payeeId} onChange={e => setPayeeId(e.target.value)} style={{ marginTop: 6 }}>
+            <select value={payeeId} onChange={e => { setPayeeId(e.target.value); setQr(null) }} style={{ marginTop: 6 }}>
               <option value="">—</option>
               {book.activePayees.map(p => (
                 <option key={p.id} value={p.id}>
@@ -331,6 +347,13 @@ export function PaymentModal({ sites, onClose, room }) {
                 </div>
               </div>
             )}
+            {picked && !picked.qr_url && (
+              <div style={{ marginTop: 10 }}>
+                <label>{picked.name} has no QR saved — attach it</label>
+                <input type="file" accept="image/*"
+                       onChange={e => setQr(e.target.files?.[0] || null)} />
+              </div>
+            )}
           </>
         )}
 
@@ -342,7 +365,7 @@ export function PaymentModal({ sites, onClose, room }) {
               <div><label>UPI id</label>
                 <input placeholder="name@bank" value={upi}
                        onChange={e => setUpi(e.target.value)} /></div>
-              <div><label>QR code photo</label>
+              <div><label>QR code photo — needed</label>
                 <input type="file" accept="image/*"
                        onChange={e => setQr(e.target.files?.[0] || null)} /></div>
             </div>
@@ -436,16 +459,43 @@ export function PayNowModal({ payment, splits, room, onClose }) {
   const [reason, setReason]   = useState('')
   const [busy, setBusy]       = useState(false)
   const [zoom, setZoom]       = useState(false)
+  const [addedQr, setAddedQr] = useState(null)
+  const [qrBusy, setQrBusy]   = useState(false)
 
   const mine = splits.filter(s => s.payment_id === payment.id)
   const canPay = !meRecord || meRecord.can_pay || meRecord.is_admin
 
   // The payment carries its own copy of the name and QR, but the book is
   // the live version — a payee who changed their UPI id has it here.
-  const payee = book.payees.find(p => p.id === payment.payee_id) || null
+  // A request typed before the book existed has no payee_id, so fall back
+  // to the name: "Test" in the book is the same Test on the request.
+  const sameName = n => String(n || '').trim().toLowerCase()
+  const payee = book.payees.find(p => p.id === payment.payee_id)
+             || (payment.pay_to_name
+                   ? book.payees.find(p => sameName(p.name) === sameName(payment.pay_to_name))
+                   : null)
+             || null
   const name  = payee?.name   || payment.pay_to_name
   const upi   = payee?.upi_id || payment.pay_to_upi
-  const qr    = payment.qr_url || payee?.qr_url
+  const qr    = addedQr || payment.qr_url || payee?.qr_url
+
+  // No QR on the request. The payer gets it on WhatsApp and attaches it
+  // here, and from then on it is on the request and in the book.
+  async function attachQr(file) {
+    if (!file) return
+    setQrBusy(true)
+    try {
+      const url = await uploadRaw(file, 'payment-qr')
+      await room.setPaymentQr(payment, url)
+      if (payee) await book.fillIn(payee, { qr_url: url })
+      setAddedQr(url)
+      toast('QR saved. Scan it to pay.', 'good')
+    } catch (err) {
+      toast(`The QR code didn't upload — ${err.message}`, 'bad')
+    } finally {
+      setQrBusy(false)
+    }
+  }
 
   const deep = upiLink({ upi, name, amount: payment.amount,
                          note: (payment.site_ids || [])[0] || payment.category })
@@ -561,7 +611,13 @@ export function PayNowModal({ payment, splits, room, onClose }) {
                 <div className="xs mut">Tap the code to fill the screen, then scan it from another phone.</div>
               </>
             : <div className="note warnN sm" style={{ marginTop: 8 }}>
-                No QR code on this request. {upi ? 'Pay to the UPI id above.' : 'Ask ' + payment.requested_by + ' for the QR or the UPI id.'}
+                <b>No QR code on this request.</b> Get it from {payment.requested_by === me
+                  ? (name || 'the payee') : payment.requested_by} and attach it here.
+                <label className="btn-file qr-add">
+                  {qrBusy ? 'Uploading…' : '+ Attach QR code'}
+                  <input type="file" accept="image/*" hidden disabled={qrBusy}
+                         onChange={e => attachQr(e.target.files?.[0])} />
+                </label>
               </div>}
 
           {deep && canOpenUpiApp() && (
