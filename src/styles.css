@@ -553,6 +553,11 @@ input[type=file] { border: none; padding: 0; font-size: 12px; }
   border-color: #f59e0b; color: #92400e;
 }
 
+/* ── phone notifications switch, foot of the bell panel ────── */
+
+.pushsw { font-size: 12.5px; line-height: 1.45; color: var(--ink); }
+.pushbtn { width: 100%; padding: 9px 12px; font-size: 14px; font-weight: 600; }
+
 /* ── phone ─────────────────────────────────────────────────── */
 
 @media (max-width: 760px) {

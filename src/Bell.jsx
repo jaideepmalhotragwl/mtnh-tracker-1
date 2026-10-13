@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useApp } from './store'
 import { useAlerts } from './useAlerts'
+import { usePush } from './usePush'
+import { useToast } from './Toast'
 
 const LOOK = {
   overdue:  { icon: '!',  colour: 'var(--red)' },
@@ -86,11 +88,66 @@ export default function Bell({ onGoToRoom }) {
             })}
           </div>
 
-          <div className="bellfoot">
-            Email for these is built but switched off — say the word and it
-            goes on.
-          </div>
+          <PushSwitch me={me} />
         </div>
+      )}
+    </div>
+  )
+}
+
+// ── phone notifications on / off ─────────────────────────────────
+
+function PushSwitch({ me }) {
+  const push = usePush(me)
+  const toast = useToast()
+
+  async function on() {
+    try { await push.turnOn(); toast('Notifications on for this phone.', 'good') }
+    catch (err) { toast(err.message, 'bad') }
+  }
+  async function off() {
+    try { await push.turnOff(); toast('Notifications off for this phone.') }
+    catch (err) { toast(err.message, 'bad') }
+  }
+
+  return (
+    <div className="bellfoot pushsw">
+      {push.state === 'on' && (
+        <div className="row">
+          <span className="grow">📱 <b>Phone notifications on</b> for {me}</span>
+          <button className="ghost tiny" disabled={push.busy} onClick={off}>Turn off</button>
+        </div>
+      )}
+
+      {push.state === 'off' && (
+        <>
+          <button className="pri pushbtn" disabled={push.busy} onClick={on}>
+            {push.busy ? 'Turning on…' : '📱 Turn on phone notifications'}
+          </button>
+          <div className="xs mut" style={{ marginTop: 5 }}>
+            Buzzes this phone for your tasks, mentions and payments — even
+            with the app closed.
+          </div>
+        </>
+      )}
+
+      {push.state === 'install-first' && (
+        <div>
+          <b>On iPhone, add the app to your home screen first.</b> In Safari
+          tap Share → Add to Home Screen, open MTNH from that icon, then come
+          back here.
+        </div>
+      )}
+
+      {push.state === 'blocked' && (
+        <div>
+          <b>Notifications are blocked on this phone.</b> Allow them for MTNH
+          in the phone's settings, then reopen the app.
+        </div>
+      )}
+
+      {push.state === 'unsupported' && (
+        <div>This browser can't show notifications. Use Chrome on Android, or the home-screen app on iPhone.</div>
       )}
     </div>
   )
