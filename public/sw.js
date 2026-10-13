@@ -11,7 +11,7 @@
 // here can clear a service worker by hand.
 // ─────────────────────────────────────────────────────────────────
 
-const VERSION = 'mtnh-v3'
+const VERSION = 'mtnh-v4'
 const SHELL = `${VERSION}-shell`
 
 self.addEventListener('install', e => {
@@ -73,6 +73,45 @@ self.addEventListener('fetch', e => {
       )
     )
   }
+})
+
+// ─────────────────────────────────────────────────────────────────
+// PHONE NOTIFICATIONS
+//
+// The database decides who to tell (mtnh_push.sql); the send-push
+// function delivers it; this is the last step — putting it on the
+// phone's lock screen, even when the app is closed.
+// ─────────────────────────────────────────────────────────────────
+
+self.addEventListener('push', e => {
+  let d = {}
+  try { d = e.data ? e.data.json() : {} } catch { d = { body: e.data ? e.data.text() : '' } }
+
+  e.waitUntil(self.registration.showNotification(d.title || 'MTNH', {
+    body: d.body || '',
+    icon: '/icon-192.png',
+    badge: '/badge-96.png',       // the small white mark in Android's status bar
+    tag: d.tag || undefined,      // a second buzz about the same payment replaces the first
+    renotify: !!d.tag,
+    data: { url: d.url || '/?go=room' }
+  }))
+})
+
+// Tapping it opens the Team Room — in the window that's already open if
+// there is one, rather than stacking up copies of the app.
+self.addEventListener('notificationclick', e => {
+  e.notification.close()
+  const target = new URL(e.notification.data?.url || '/?go=room', self.location.origin).href
+
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      const open = list.find(c => c.url.startsWith(self.location.origin))
+      if (open) {
+        return open.focus().then(c => (c || open).navigate ? (c || open).navigate(target) : null)
+      }
+      return self.clients.openWindow(target)
+    })
+  )
 })
 
 function offlineCard() {
