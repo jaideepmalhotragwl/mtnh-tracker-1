@@ -467,6 +467,84 @@ input[type=file] { border: none; padding: 0; font-size: 12px; }
   background: #eef2ff; border-bottom: 1px solid #c7d2fe;
 }
 
+/* ── paying someone ────────────────────────────────────────── */
+
+.payee-box { padding: 12px; }
+
+.qr-thumb {
+  width: 64px; height: 64px; object-fit: contain;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: #fff; padding: 3px; display: block; cursor: pointer;
+}
+.qr-thumb.none {
+  display: grid; place-items: center;
+  font-size: 10px; color: var(--muted); background: var(--line);
+  cursor: default;
+}
+
+/* The QR has to be big enough to scan off this screen with a second
+   phone, which is how it actually gets used when one person is holding
+   the request and another is paying. */
+.qr-big {
+  display: block; width: 100%; max-width: 230px;
+  margin: 10px auto 4px; padding: 8px;
+  background: #fff; border: 1px solid var(--border); border-radius: 10px;
+  cursor: zoom-in;
+}
+
+.qr-full {
+  position: fixed; inset: 0; z-index: 400;
+  background: #000; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 14px;
+  padding: 20px; cursor: zoom-out;
+}
+.qr-full img {
+  width: min(86vw, 420px); background: #fff;
+  padding: 14px; border-radius: 12px;
+}
+.qr-full-t { color: #fff; text-align: center; font-size: 13px; line-height: 1.5; }
+.qr-full-t .xs { color: #9ca3af; display: block; margin-top: 4px; }
+
+/* An anchor, not a button, because only a real link hands upi:// to
+   the phone's UPI app. So it carries its own button styling. */
+.upi-btn {
+  display: block; margin-top: 10px; padding: 12px 14px;
+  background: var(--green); color: #fff; text-decoration: none;
+  border-radius: 9px; text-align: center; font-weight: 600; font-size: 15px;
+}
+.upi-btn:active { filter: brightness(0.92); }
+
+/* Numbered, because on a phone the two halves don't fit on one screen
+   and people need to know there is a second half. */
+.paystep {
+  display: flex; gap: 11px; margin-top: 14px;
+  padding: 12px; border: 1px solid var(--border); border-radius: 10px;
+  background: #fafafa;
+}
+.paystep-n {
+  flex: 0 0 24px; height: 24px; border-radius: 50%;
+  background: var(--blue); color: #fff;
+  display: grid; place-items: center; font-size: 12px; font-weight: 700;
+}
+
+.proof {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line);
+}
+
+.ok-t  { color: var(--green); margin-top: 4px; }
+.bad-t { color: var(--red);   margin-top: 4px; }
+
+/* A file input dressed as a button, so "New QR" sits in a row of them.
+   A label, not a button, because only a label can open a file picker. */
+.btn-file {
+  display: inline-block; cursor: pointer;
+  padding: 3px 8px; font-size: 12px;
+  border: 1px solid var(--border); border-radius: 7px;
+  background: #fff; color: var(--ink); line-height: 1.6;
+}
+.btn-file:hover { background: var(--line); }
+
 /* ── phone ─────────────────────────────────────────────────── */
 
 @media (max-width: 760px) {
@@ -514,4 +592,9 @@ input[type=file] { border: none; padding: 0; font-size: 12px; }
 
   /* 16px keeps iOS from zooming the whole page when a field is tapped */
   input, select, textarea { font-size: 16px; }
+
+  /* The QR is being scanned off this screen by a second phone held a
+     few inches away, so it wants the width rather than a tidy card. */
+  .qr-big { max-width: 100%; }
+  .paystep { padding: 11px 10px; gap: 9px; }
 }

@@ -44,7 +44,7 @@ export function useAlerts(me, meRecord) {
     const today = new Date().toISOString().slice(0, 10)
 
     try {
-      const [tasks, pays, settled, msgs] = await Promise.all([
+      const [tasks, pays, settled, msgs, noProof] = await Promise.all([
         supabase.from('room_tasks')
           .select('*').eq('assigned_to', me).eq('status', 'open')
           .order('due_date', { nullsFirst: false }),
@@ -60,7 +60,15 @@ export function useAlerts(me, meRecord) {
 
         supabase.from('room_messages')
           .select('*').contains('mentions', [me])
-          .gt('created_at', since).order('created_at', { ascending: false }).limit(20)
+          .gt('created_at', since).order('created_at', { ascending: false }).limit(20),
+
+        // Paid by me, nothing attached. utr_ref only exists once
+        // mtnh_payees.sql has been run; until then this query comes back
+        // with an error and an empty list, and the bell is unaffected.
+        supabase.from('room_payments')
+          .select('*').eq('status', 'paid').eq('paid_by', me)
+          .is('utr_ref', null).is('receipt_url', null)
+          .order('paid_at', { ascending: false }).limit(20)
       ])
 
       const out = []
@@ -93,6 +101,9 @@ export function useAlerts(me, meRecord) {
       }
 
       for (const p of settled.data || []) {
+        const proof = p.utr_ref
+          ? `ref ${p.utr_ref}`
+          : p.receipt_url ? 'screenshot attached' : 'no proof'
         out.push({
           id: `s_${p.id}`,
           kind: p.status === 'paid' ? 'paid' : 'declined',
@@ -101,10 +112,29 @@ export function useAlerts(me, meRecord) {
             ? `₹${Number(p.amount).toLocaleString('en-IN')} was paid`
             : `₹${Number(p.amount).toLocaleString('en-IN')} was declined`,
           note: p.status === 'paid'
-            ? `${p.paid_by} · ${p.paid_mode || ''}`.trim()
+            ? [p.paid_by, p.paid_mode, proof].filter(Boolean).join(' · ')
             : (p.decline_reason || 'no reason given'),
           isNew: true,
           act: false
+        })
+      }
+
+      // Something you paid with nothing behind it. A screenshot is easy
+      // to add the same day and impossible to find three weeks later, so
+      // this stays on the list until one is attached — it is the only
+      // item here that asks for work on something already finished.
+      for (const p of noProof.data || []) {
+        // Cash never had a screenshot to attach. Asking for one for ever
+        // is how a badge becomes background noise.
+        if (/cash/i.test(p.paid_mode || '')) continue
+        out.push({
+          id: `n_${p.id}`,
+          kind: 'noproof',
+          when: p.paid_at,
+          title: `₹${Number(p.amount).toLocaleString('en-IN')} paid with no proof`,
+          note: `${p.pay_to_name || p.category.replace('_', ' ')} · attach the screenshot`,
+          isNew: p.paid_at > since,
+          act: true
         })
       }
 

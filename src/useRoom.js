@@ -316,12 +316,15 @@ export function useRoom() {
   // A payment request. `siteSplits` is [{site_id, amount}] when the money
   // is divided per site. Only a split posts to the site records — a lump
   // sum is logged against the sites but attributed to none of them.
-  async function requestPayment({ category, amount, splitMode, siteIds, vendor, payToName, payToUpi, qrUrl, note, by, siteSplits }) {
+  async function requestPayment({ category, amount, splitMode, siteIds, vendor, payToName, payToUpi, qrUrl, payeeId, note, by, siteSplits }) {
     const { data, error } = await supabase.from('room_payments').insert({
       category, amount, split_mode: splitMode,
       site_ids: siteIds || [], vendor: vendor || null,
       pay_to_name: payToName || null, pay_to_upi: payToUpi || null,
       qr_url: qrUrl || null, note: note || null,
+      // Only sent once the payee book exists. An unknown column would
+      // make the whole insert fail, which is how due dates broke before.
+      ...(payeeId ? { payee_id: payeeId } : {}),
       requested_by: by
     }).select().single()
     if (error) throw new Error(errLine(error))
@@ -345,13 +348,45 @@ export function useRoom() {
     return data
   }
 
-  async function markPaid(payment, { by, mode, receiptUrl }) {
+  // Proof goes in BEFORE the money is marked paid, and on its own.
+  //
+  // Before, because utr_ref carries a unique index — it is the write
+  // that can be refused, and when it is refused nothing has settled yet,
+  // so the person can fix the number and try again rather than finding a
+  // paid payment with the wrong reference on it.
+  //
+  // On its own, because that column only exists once mtnh_payees.sql has
+  // been run. Bundled with the rest, a missing column makes the whole
+  // update fail and the payment silently refuses to settle — which is
+  // exactly how due dates failed before.
+  async function markPaid(payment, { by, mode, receiptUrl, utrRef }) {
+    let refWarning = ''
+
+    if (utrRef) {
+      const r = await supabase.from('room_payments').update({
+        utr_ref: utrRef, proof_by: by, proof_at: new Date().toISOString()
+      }).eq('id', payment.id)
+
+      if (r.error) {
+        if (r.error.code === '23505') {
+          throw new Error(
+            `Transaction number ${utrRef} is already on another payment. ` +
+            `Check you are not submitting the same screenshot twice.`
+          )
+        }
+        refWarning = 'Marked paid, but the transaction number could not be ' +
+                     'saved — run mtnh_payees.sql in Supabase.'
+      }
+    }
+
     const { error } = await supabase.from('room_payments').update({
       status: 'paid', paid_by: by, paid_at: new Date().toISOString(),
       paid_mode: mode, receipt_url: receiptUrl || null
     }).eq('id', payment.id)
     if (error) throw new Error(errLine(error))
+
     await load()
+    return { refWarning }
   }
 
   async function declinePayment(payment, { by, reason }) {

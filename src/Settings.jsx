@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { supabase, errLine } from './supabase'
 import { useApp } from './store'
 import { useToast } from './Toast'
+import { usePayees } from './usePayees'
+import { uploadRaw } from './usePhotos'
 
 // ─────────────────────────────────────────────────────────────────
 // SETTINGS  (R6)
@@ -21,11 +23,13 @@ export default function Settings() {
       <div className="nav" style={{ marginBottom: 14 }}>
         <button className={tab === 'people'  ? 'on' : ''} onClick={() => setTab('people')}>People</button>
         <button className={tab === 'vendors' ? 'on' : ''} onClick={() => setTab('vendors')}>Vendors</button>
+        <button className={tab === 'payees'  ? 'on' : ''} onClick={() => setTab('payees')}>Payees</button>
         <button className={tab === 'stages'  ? 'on' : ''} onClick={() => setTab('stages')}>Upload slots</button>
       </div>
 
       {tab === 'people'  && <People />}
       {tab === 'vendors' && <Vendors />}
+      {tab === 'payees'  && <Payees />}
       {tab === 'stages'  && <Stages />}
     </>
   )
@@ -295,6 +299,164 @@ function Vendors() {
       <div className="sm mut" style={{ marginTop: 10 }}>
         An alias means one company never becomes two records. UST and Mobilecom
         are the same company, so an Excel sheet saying "Mobilecom" imports as UST.
+      </div>
+    </>
+  )
+}
+
+// ── payees ───────────────────────────────────────────────────────
+//
+// The QR codes. One entry per person being paid, their code saved once
+// and picked from a list after that.
+
+function Payees() {
+  const { me, activeVendors } = useApp()
+  const book = usePayees()
+  const toast = useToast()
+  const gate = useAdminGate()
+  const [adding, setAdding] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [form, setForm] = useState({ name: '', upi: '', phone: '', vendor: '', note: '', qr: null })
+
+  async function add() {
+    if (!form.name.trim()) { toast('Name?', 'bad'); return }
+    setBusy(true)
+    try {
+      let qrUrl = null
+      if (form.qr) qrUrl = await uploadRaw(form.qr, 'payment-qr')
+      await book.addPayee({
+        name: form.name, upiId: form.upi, phone: form.phone,
+        vendor: form.vendor || null, note: form.note, qrUrl, by: me
+      })
+      toast(`${form.name.trim()} added.`, 'good')
+      setForm({ name: '', upi: '', phone: '', vendor: '', note: '', qr: null })
+      setAdding(false)
+    } catch (err) {
+      toast(err.message, 'bad')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function replaceQr(payee, file) {
+    if (!file) return
+    try {
+      const url = await uploadRaw(file, 'payment-qr')
+      await book.updatePayee(payee, { qr_url: url })
+      toast(`New QR saved for ${payee.name}.`, 'good')
+    } catch (err) { toast(err.message, 'bad') }
+  }
+
+  if (!book.ready) {
+    return (
+      <>
+        <h2 style={{ marginBottom: 12 }}>Payees</h2>
+        <div className="note warnN">
+          The payee book isn't set up yet. Run <b className="mono">mtnh_payees.sql</b>{' '}
+          in the Supabase SQL Editor and this page fills itself in from the
+          payments you have already made.
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <>
+      {!gate.ok && <div className="note warnN">{gate.why}</div>}
+
+      <div className="row" style={{ marginBottom: 12 }}>
+        <h2>Payees</h2>
+        <button className="pri right" disabled={!gate.ok} onClick={() => setAdding(a => !a)}>
+          {adding ? 'Cancel' : 'Add a payee'}
+        </button>
+      </div>
+
+      <div className="note info">
+        A QR code belongs to a person, not to a payment. Saved here once, it
+        is one tap away every time afterwards — nobody scrolls back through
+        chat looking for it.
+      </div>
+
+      {adding && (
+        <div className="panel">
+          <div className="grid3">
+            <div><label>Name</label>
+              <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
+            <div><label>UPI id</label>
+              <input placeholder="name@bank" value={form.upi}
+                     onChange={e => setForm({ ...form, upi: e.target.value })} /></div>
+            <div><label>Phone</label>
+              <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
+            <div><label>Vendor they work under</label>
+              <select value={form.vendor} onChange={e => setForm({ ...form, vendor: e.target.value })}>
+                <option value="">—</option>
+                {activeVendors.map(v => <option key={v.name} value={v.name}>{v.name}</option>)}
+              </select></div>
+            <div><label>QR code photo</label>
+              <input type="file" accept="image/*"
+                     onChange={e => setForm({ ...form, qr: e.target.files?.[0] || null })} /></div>
+            <div><label>Note</label>
+              <input value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} /></div>
+          </div>
+          <button className="pri" style={{ marginTop: 12 }} disabled={busy} onClick={add}>
+            {busy ? 'Saving…' : 'Add'}
+          </button>
+        </div>
+      )}
+
+      <div className="tbl-wrap">
+        <table>
+          <thead>
+            <tr><th>QR</th><th>Name</th><th>UPI id</th><th>Vendor</th><th>Paid</th><th></th></tr>
+          </thead>
+          <tbody>
+            {book.payees.map(p => (
+              <tr key={p.id} className={p.active === false ? 'dim' : ''}>
+                <td>
+                  {p.qr_url
+                    ? <a href={p.qr_url} target="_blank" rel="noreferrer">
+                        <img className="qr-thumb" src={p.qr_url} alt="QR" />
+                      </a>
+                    : <div className="qr-thumb none">none</div>}
+                </td>
+                <td>
+                  <b>{p.name}</b>
+                  {p.active === false && <span className="tag" style={{ marginLeft: 6 }}>archived</span>}
+                  {p.phone && <div className="xs fnt">{p.phone}</div>}
+                  {p.note && <div className="xs fnt">{p.note}</div>}
+                </td>
+                <td className="sm mono">{p.upi_id || '—'}</td>
+                <td className="sm">{p.vendor || '—'}</td>
+                <td className="sm">
+                  {p.times_paid || 0}×
+                  {p.last_paid_at && <div className="xs fnt">last {p.last_paid_at.slice(0, 10)}</div>}
+                </td>
+                <td>
+                  <div className="row" style={{ gap: 6 }}>
+                    <label className="btn-file">
+                      {p.qr_url ? 'New QR' : 'Add QR'}
+                      <input type="file" accept="image/*" hidden disabled={!gate.ok}
+                             onChange={e => replaceQr(p, e.target.files?.[0])} />
+                    </label>
+                    <button className="tiny" disabled={!gate.ok}
+                            onClick={() => book.archivePayee(p).catch(err => toast(err.message, 'bad'))}>
+                      {p.active === false ? 'Restore' : 'Archive'}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {book.payees.length === 0 && (
+              <tr><td colSpan={6} className="sm fnt">Nobody in the book yet.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="sm mut" style={{ marginTop: 10 }}>
+        <b>If a QR changes</b>, use New QR rather than adding a second entry.
+        Two people called Anil Kumar Patel carrying different codes is how the
+        wrong man gets paid.
       </div>
     </>
   )

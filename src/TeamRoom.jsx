@@ -494,8 +494,33 @@ function Message({ m, room, me, people, onOpenSite, onPay }) {
               </div>
             )}
 
-            {payment.receipt_url && (
-              <a className="xs" href={payment.receipt_url} target="_blank" rel="noreferrer">View receipt</a>
+            {payment.status === 'paid' && (
+              <div className="proof">
+                {payment.receipt_url && (
+                  <a className="tag good" href={payment.receipt_url} target="_blank" rel="noreferrer">
+                    View screenshot
+                  </a>
+                )}
+                {payment.utr_ref && (
+                  <span className="tag mono" title="Transaction number">
+                    ref {payment.utr_ref}
+                  </span>
+                )}
+                {!payment.receipt_url && !payment.utr_ref && (
+                  <span className="tag warn">
+                    no proof{/cash/i.test(payment.paid_mode || '') ? ' — cash' : ''}
+                  </span>
+                )}
+                <span className="xs fnt">
+                  {payment.paid_by}{payment.paid_mode ? ` · ${payment.paid_mode}` : ''}
+                </span>
+              </div>
+            )}
+
+            {payment.status === 'pending' && payment.qr_url && (
+              <a className="xs" href={payment.qr_url} target="_blank" rel="noreferrer">
+                QR code for {payment.pay_to_name || 'the payee'}
+              </a>
             )}
           </div>
         )}

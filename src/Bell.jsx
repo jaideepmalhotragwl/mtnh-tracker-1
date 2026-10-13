@@ -8,6 +8,7 @@ const LOOK = {
   payment:  { icon: '₹',  colour: 'var(--purple)' },
   paid:     { icon: '₹',  colour: 'var(--green)' },
   declined: { icon: '₹',  colour: 'var(--red)' },
+  noproof:  { icon: '📷', colour: 'var(--amber)' },
   mention:  { icon: '@',  colour: 'var(--cyan)' }
 }
 
